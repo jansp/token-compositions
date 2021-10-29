@@ -9,16 +9,28 @@ import "@openzeppelin/contracts/utils/Counters.sol";
 
 contract Component is IERC721Receiver, ERC721Enumerable {
     
+    address owner;
+    
     using Counters for Counters.Counter;
     Counters.Counter private _tokenIds;
     
+    // Manage token ingredients
     bool internal hasIngredients = false;
     address[] internal ingredients;
     uint256[] internal ingredientCount;
     uint256 noIngredients = 0;
     
-    address owner;
+    // Token counter
     uint256 curToken = 0;
+    
+    // Tracks approved tokens per adr, _approvedTokens[adr][idx] = tokenID
+    mapping(address => mapping(uint256 => uint256)) private _approvedTokens;
+    
+    // Tracks approved tokens per adr, _approvedTokensIdx[adr][tokenID] = idx
+    mapping(address => mapping(uint256 => uint256)) private _approvedTokensIdx;
+    
+    // Track no. of approved tokens per adr
+    mapping(address => uint256) private _tokenCount;
     
     
     constructor(string memory componentName, string memory componentShort) ERC721(componentName, componentShort) {
@@ -42,14 +54,16 @@ contract Component is IERC721Receiver, ERC721Enumerable {
         if (hasIngredients) {
             // check for ingredients
             for(uint256 i=0; i < noIngredients; i++) {
-                require(Component(ingredients[i]).balanceOf(address(this)) >= ingredientCount[i]);
+                require(Component(ingredients[i]).approvedBalance(address(this)) >= ingredientCount[i]);
             }
+            
             
             // burn ingredients
             for(uint256 i=0; i < noIngredients; i++) {
                 Component c = Component(ingredients[i]);
                 for(uint256 j=0; j < ingredientCount[i]; j++) {
-                    c.burn(c.tokenOfOwnerByIndex(address(this), 0));
+                    uint256 tID = c.approvedTokenAtIdx(j);
+                    c.burn(tID);
                 }
             }
         }
@@ -70,10 +84,11 @@ contract Component is IERC721Receiver, ERC721Enumerable {
     function mintBatch(uint256 amount) public returns (uint256) {
         require(msg.sender == owner);
         
+        
         if (hasIngredients) {
             // check for ingredients
             for(uint256 i=0; i < noIngredients; i++) {
-                require(Component(ingredients[i]).balanceOf(address(this)) >= ingredientCount[i]*amount);
+                require(Component(ingredients[i]).approvedBalance(address(this)) >= ingredientCount[i] * amount);
             }
         }
         
@@ -91,12 +106,18 @@ contract Component is IERC721Receiver, ERC721Enumerable {
         return batchNo;
     }
 
+
+    // approve token (make burnable for address "to")
     function transferToken(address to) internal returns (uint256) {
         require(msg.sender == owner);
         
         curToken++;
-        safeTransferFrom(owner, to, curToken);
-        
+        //safeTransferFrom(owner, to, curToken);
+        approve(to, curToken);
+        uint256 curr = _tokenCount[to];
+        _approvedTokens[to][curr] = curToken;
+        _approvedTokensIdx[to][curToken] = curr;
+        _tokenCount[to] += 1;
         return curToken;
     }
     
@@ -108,12 +129,26 @@ contract Component is IERC721Receiver, ERC721Enumerable {
         }
     }
     
-    // from ERC721Burnable
+    
     function burn(uint256 tokenId) public {
         //solhint-disable-next-line max-line-length
         require(_isApprovedOrOwner(_msgSender(), tokenId), "ERC721Burnable: caller is not owner nor approved");
         _burn(tokenId);
+        uint256 idx = _approvedTokens[msg.sender][tokenId];
+        _approvedTokens[msg.sender][idx] = _approvedTokens[msg.sender][_tokenCount[msg.sender] - 1];
+        _tokenCount[msg.sender]--;
     }
+    
+    // Get amount of approved tokens for adr
+    function approvedBalance(address adr) public view returns (uint256) {
+        return _tokenCount[adr];
+    }
+    
+    // Get tokenID of approved token at index idx
+    function approvedTokenAtIdx(uint256 idx) public view returns (uint256) {
+        return _approvedTokens[msg.sender][idx];
+    }
+    
     
     function onERC721Received(address, address, uint256, bytes memory) public virtual override returns (bytes4) {
         return this.onERC721Received.selector;

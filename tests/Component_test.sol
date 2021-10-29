@@ -33,13 +33,6 @@ contract ComponentTest {
         //gluedWood.mintBatch(2);
     }
     
-    function getSawmillOwnedWoodTokens() public view returns (uint256) {
-        return wood.balanceOf(address(gluedWood));
-    }
-    
-    function getSawmillOwnedGlueTokens() public view returns (uint256) {
-        return glue.balanceOf(address(gluedWood));
-    }
     
     function getOwnedGluedWoodTokens() public view returns (uint256) {
         return gluedWood.balanceOf(address(this));
