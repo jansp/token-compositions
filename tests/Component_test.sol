@@ -1,10 +1,9 @@
+// SPDX-License-Identifier: MIT
 pragma solidity ^0.8.0;
 import "remix_tests.sol"; // this import is automatically injected by Remix.
 import "../contracts/Component.sol";
 
 contract ComponentTest {
-   
-    bytes32[] proposalNames;
    
     Component glue;
     Component wood;
@@ -30,7 +29,20 @@ contract ComponentTest {
     }
     
     function mintComponentWithIngredients() public {
-        gluedWood.mintComponent("FirstGluedWood");
+        gluedWood.mintComponent();
+        //gluedWood.mintBatch(2);
+    }
+    
+    function getSawmillOwnedWoodTokens() public view returns (uint256) {
+        return wood.balanceOf(address(gluedWood));
+    }
+    
+    function getSawmillOwnedGlueTokens() public view returns (uint256) {
+        return glue.balanceOf(address(gluedWood));
+    }
+    
+    function getOwnedGluedWoodTokens() public view returns (uint256) {
+        return gluedWood.balanceOf(address(this));
     }
     
 }
