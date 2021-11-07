@@ -7,150 +7,121 @@ import "@openzeppelin/contracts/token/ERC721/extensions/ERC721Enumerable.sol";
 import "@openzeppelin/contracts/utils/Counters.sol";
 
 
+struct Batch {
+    address adr;
+    uint256 tId;
+}
+
+struct Ingredient {
+    address adr;
+    uint256 amount;
+}
+
+/** @title Token Compositions Contract */
 contract Component is IERC721Receiver, ERC721Enumerable {
     
-    address owner;
+    address internal _owner;
     
     using Counters for Counters.Counter;
     Counters.Counter private _tokenIds;
     
+    // Map tokenId to (remaining) balance of token/batch
+    mapping(uint256 => uint256) private _tokenBalance;
+    
     // Manage token ingredients
-    bool internal hasIngredients = false;
-    address[] internal ingredients;
-    uint256[] internal ingredientCount;
-    uint256 noIngredients = 0;
+    Ingredient[] internal _ingredients;
+    bool internal _hasIngredients = false;
+
     
-    // Token counter
-    uint256 curToken = 0;
+    modifier isOwner() {
+        require(msg.sender == _owner, "Access denied");
+        _;
+    }
     
-    // Tracks approved tokens per adr, _approvedTokens[adr][idx] = tokenID
-    mapping(address => mapping(uint256 => uint256)) private _approvedTokens;
-    
-    // Tracks approved tokens per adr, _approvedTokensIdx[adr][tokenID] = idx
-    mapping(address => mapping(uint256 => uint256)) private _approvedTokensIdx;
-    
-    // Track no. of approved tokens per adr
-    mapping(address => uint256) private _tokenCount;
-    
-    
-    constructor(string memory componentName, string memory componentShort) ERC721(componentName, componentShort) {
-        owner = msg.sender;
+    /** @dev Component constructor
+     *  @param componentName Name of component
+     *  @param componentShort Abbreviation of component name
+     *  @param ingr Array of Ingredients (Pass empty array for basic component)
+     */
+    constructor(string memory componentName, string memory componentShort, Ingredient[] memory ingr) ERC721(componentName, componentShort) {
+        _owner = msg.sender;
+        
+        if (ingr.length > 0) {
+            _hasIngredients = true;
+            for(uint i=0; i < ingr.length; i++) {
+                _ingredients.push(ingr[i]);
+            }
+        }
     }
     
 
-    function addIngredient(address ingredientAdr, uint256 amount) public {
-        require(msg.sender == owner);
+    /** @dev Mint new batch of components
+     *  @param batchSize Size of new batch
+     *  @param batchesToBurn Array with addresses & batch IDs of ingredients to burn for batch creation
+     *  @return newTokenId TokenID of newly minted batch
+     */
+    function mintBatch(uint256 batchSize, Batch[] memory batchesToBurn) public isOwner returns (uint256) {
+        require(batchSize >= 1);
         
-        hasIngredients = true;
-        ingredients.push(ingredientAdr);
-        ingredientCount.push(amount);
-        noIngredients++;
-    }
-
-
-    function mintComponent() public returns (uint256) {
-        require(msg.sender == owner);
-        
-        if (hasIngredients) {
+        if (_hasIngredients) {
+            // TODO add batch merging
+            
             // check for ingredients
-            for(uint256 i=0; i < noIngredients; i++) {
-                require(Component(ingredients[i]).approvedBalance(address(this)) >= ingredientCount[i]);
+            for(uint256 i=0; i < _ingredients.length; i++) {
+                require(_ingredients[i].adr == batchesToBurn[i].adr, "Batches provided in wrong order");
+                uint256 amountNeededPerItem = _ingredients[i].amount;
+                uint256 tokenToBurn = batchesToBurn[i].tId;
+                Component c = Component(_ingredients[i].adr);
+                require(c.getTokenBalance(tokenToBurn) >= amountNeededPerItem * batchSize);
             }
             
             
             // burn ingredients
-            for(uint256 i=0; i < noIngredients; i++) {
-                Component c = Component(ingredients[i]);
-                for(uint256 j=0; j < ingredientCount[i]; j++) {
-                    uint256 tID = c.approvedTokenAtIdx(j);
-                    c.burn(tID);
-                }
+            for(uint256 i=0; i < _ingredients.length; i++) {
+                Component c = Component(_ingredients[i].adr);
+                c.burn(batchesToBurn[i].tId, batchSize * _ingredients[i].amount);
             }
         }
         
+        
+        // create new token/batch
         _tokenIds.increment();
     
-        uint256 newItemId = _tokenIds.current();
-        _mint(owner, newItemId);
-        //approve(address(this), newItemId);
+        uint256 newTokenId = _tokenIds.current();
+        _mint(_owner, newTokenId);
+        _tokenBalance[newTokenId] = batchSize;
     
-        return newItemId;
+        return newTokenId;
     }
     
-    uint256 batchNo = 0;
-    mapping (uint256 => uint256) public batch;
-    mapping (uint256 => uint256) internal batchSize;
     
-    function mintBatch(uint256 amount) public returns (uint256) {
-        require(msg.sender == owner);
+    /** @dev Returns remaining balance of a batch
+     *  @param tokenId Batch ID
+     *  @return _tokenBalance[tokenId] Remaining balance of batch
+     */
+    function getTokenBalance(uint256 tokenId) public view returns (uint256) {
+        require(_isApprovedOrOwner(_msgSender(), tokenId), "Caller is not owner nor approved");
         
-        
-        if (hasIngredients) {
-            // check for ingredients
-            for(uint256 i=0; i < noIngredients; i++) {
-                require(Component(ingredients[i]).approvedBalance(address(this)) >= ingredientCount[i] * amount);
-            }
-        }
-        
-        batchNo++;
-        uint256 cID;
-        
-        for(uint256 i=0; i < amount; i++) {
-            cID = mintComponent();
-            // TODO revert if minting one component fails
-            batch[cID] = batchNo;
-        }
-        
-        batchSize[batchNo] = amount;
-
-        return batchNo;
-    }
-
-
-    // approve token (make burnable for address "to")
-    function transferToken(address to) internal returns (uint256) {
-        require(msg.sender == owner);
-        
-        curToken++;
-        //safeTransferFrom(owner, to, curToken);
-        approve(to, curToken);
-        uint256 curr = _tokenCount[to];
-        _approvedTokens[to][curr] = curToken;
-        _approvedTokensIdx[to][curToken] = curr;
-        _tokenCount[to] += 1;
-        return curToken;
+        return _tokenBalance[tokenId];
     }
     
-    function transferTokens(address to, uint256 amount) public {
-        require(msg.sender == owner);
+    /** @dev Reduce batch by amount
+     *  @param tokenId Batch ID to use
+     *  @param amount Amount to burn
+     */
+    function burn(uint256 tokenId, uint256 amount) public {
+        require(_isApprovedOrOwner(_msgSender(), tokenId), "Caller is not owner nor approved");
+        require(_tokenBalance[tokenId] >= amount, "Balance too low");
         
-        for(uint256 i=0; i < amount; i++) {
-            transferToken(to);
+        _tokenBalance[tokenId] -= amount;
+        
+        if(_tokenBalance[tokenId] == 0) {
+            _burn(tokenId);
         }
     }
     
     
-    function burn(uint256 tokenId) public {
-        //solhint-disable-next-line max-line-length
-        require(_isApprovedOrOwner(_msgSender(), tokenId), "ERC721Burnable: caller is not owner nor approved");
-        _burn(tokenId);
-        uint256 idx = _approvedTokens[msg.sender][tokenId];
-        _approvedTokens[msg.sender][idx] = _approvedTokens[msg.sender][_tokenCount[msg.sender] - 1];
-        _tokenCount[msg.sender]--;
-    }
-    
-    // Get amount of approved tokens for adr
-    function approvedBalance(address adr) public view returns (uint256) {
-        return _tokenCount[adr];
-    }
-    
-    // Get tokenID of approved token at index idx
-    function approvedTokenAtIdx(uint256 idx) public view returns (uint256) {
-        return _approvedTokens[msg.sender][idx];
-    }
-    
-    
-    function onERC721Received(address, address, uint256, bytes memory) public virtual override returns (bytes4) {
+    function onERC721Received(address, address from, uint256 tokenId, bytes memory) public virtual override returns (bytes4) {
         return this.onERC721Received.selector;
     }
     

@@ -10,32 +10,35 @@ contract ComponentTest {
     Component gluedWood;
     
     function beforeAll () public {
-        glue = new Component("Glue", "GLU");
-        wood = new Component("Wooden log", "LOG");
+        glue = new Component("Glue", "GLU", new Ingredient[](0));
+        wood = new Component("Wooden log", "LOG", new Ingredient[](0));
         
-        gluedWood = new Component("Glued Wood", "GLW");
-        gluedWood.addIngredient(address(glue), 2);
-        gluedWood.addIngredient(address(wood), 3);
+        Ingredient[] memory ingr = new Ingredient[](2);
+        ingr[0] = Ingredient(address(glue), 2);
+        ingr[1] = Ingredient(address(wood), 3);
+
+        gluedWood = new Component("Glued Wood", "GLW", ingr);
     }
     
     function mintBasicComponent () public {
-        glue.mintBatch(2);
-        wood.mintBatch(3);
+        glue.mintBatch(4, new Batch[](0));
+        wood.mintBatch(6, new Batch[](0));
     }
     
-    function transferIngredientsToSawmill () public {
-        glue.transferTokens(address(gluedWood), 2);
-        wood.transferTokens(address(gluedWood), 3);
+    function approveIngredientsForSawmill () public {
+        uint256 tokenId = 1;
+        glue.approve(address(gluedWood), tokenId);
+        wood.approve(address(gluedWood), tokenId);
     }
     
     function mintComponentWithIngredients() public {
-        gluedWood.mintComponent();
-        //gluedWood.mintBatch(2);
-    }
-    
-    
-    function getOwnedGluedWoodTokens() public view returns (uint256) {
-        return gluedWood.balanceOf(address(this));
+        Batch[] memory batchesToBurn = new Batch[](2);
+        
+        // define address and batchId to burn
+        batchesToBurn[0] = Batch(address(glue), 1);
+        batchesToBurn[1] = Batch(address(wood), 1);
+        
+        gluedWood.mintBatch(1, batchesToBurn);
     }
     
 }
