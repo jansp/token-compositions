@@ -1,9 +1,8 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.0;
 
-import "@openzeppelin/contracts/token/ERC721/extensions/ERC721URIStorage.sol";
 import "@openzeppelin/contracts/token/ERC721/IERC721Receiver.sol";
-import "@openzeppelin/contracts/token/ERC721/extensions/ERC721Enumerable.sol";
+import "@openzeppelin/contracts/token/ERC721/ERC721.sol";
 import "@openzeppelin/contracts/utils/Counters.sol";
 
 
@@ -18,7 +17,7 @@ struct Ingredient {
 }
 
 /** @title Token Compositions Contract */
-contract Component is IERC721Receiver, ERC721Enumerable {
+contract Component is IERC721Receiver, ERC721 {
     
     address internal _owner;
     
@@ -121,7 +120,7 @@ contract Component is IERC721Receiver, ERC721Enumerable {
     }
     
     
-    function onERC721Received(address, address from, uint256 tokenId, bytes memory) public virtual override returns (bytes4) {
+    function onERC721Received(address, address /*from*/, uint256 /*tokenId*/, bytes memory) public virtual override returns (bytes4) {
         return this.onERC721Received.selector;
     }
     
