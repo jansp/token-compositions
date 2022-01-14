@@ -1,13 +1,15 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.0;
-import "remix_tests.sol"; // this import is automatically injected by Remix.
 import "../contracts/Component.sol";
+import "../contracts/WrappingContract.sol";
 
 contract ComponentTest {
    
     Component glue;
     Component wood;
     Component gluedWood;
+
+    WrappingContract wrappingContract;
     
     function beforeAll () public {
         glue = new Component("Glue", "GLU", new Ingredient[](0));
@@ -18,6 +20,8 @@ contract ComponentTest {
         ingr[1] = Ingredient(address(wood), 3);
 
         gluedWood = new Component("Glued Wood", "GLW", ingr);
+
+        wrappingContract = new WrappingContract();
     }
     
     function mintBasicComponent () public {
@@ -39,6 +43,17 @@ contract ComponentTest {
         batchesToBurn[1] = Batch(address(wood), 1);
         
         gluedWood.mintBatch(1, batchesToBurn);
+    }
+
+    function transferToWrappingContractAndLock(address to) public {
+        uint256 tokenId = 1;
+        Batch memory batch;
+        batch.tId = tokenId;
+        batch.adr = address(glue);
+        
+
+        glue.approve(address(wrappingContract), tokenId);
+        wrappingContract.lock(to, batch.adr, batch.tId);
     }
     
 }
