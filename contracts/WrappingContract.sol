@@ -5,16 +5,10 @@ import "openzeppelin-solidity/contracts/token/ERC721/ERC721.sol";
 import "../contracts/Component.sol";
 
 
-struct Token {
-    address tContract;
-    uint256 tId;
-}
-
 contract WrappingContract is IERC721Receiver {
-
     address internal _owner;
 
-    mapping (address => Token) lockedTokens;
+    mapping (bytes32 => address) lockedTokens;
     event locked(address to, address tokenContract, uint256 tokenId);
 
     modifier isOwner() {
@@ -26,6 +20,12 @@ contract WrappingContract is IERC721Receiver {
         _owner = msg.sender;
     }
 
+    
+    /** @dev locks token to address
+     *  @param to receiver,
+     *  @param tokenContract ERC721 contract address
+     *  @param tokenId Batch ID
+     */
     function lock(address to, address tokenContract, uint256 tokenId) public {
         ERC721 c = ERC721(tokenContract);
 
@@ -43,24 +43,23 @@ contract WrappingContract is IERC721Receiver {
 
     }
 
+    /** @dev Saves locked token to mapping and emits lock event
+     *  @param to receiver,
+     *  @param tokenContract ERC721 contract address
+     *  @param tokenId Batch ID
+     */
     function lockToken(address to, address tokenContract, uint256 tokenId) internal {
-        Token memory t;
-        t.tContract = tokenContract;
-        t.tId = tokenId;
+        bytes32 token = keccak256(abi.encodePacked(tokenContract, tokenId));
 
-        lockedTokens[to] = t;
+        lockedTokens[token] = to;
         emit locked(to, tokenContract, tokenId);
     }
 
+    function getLockedTokenAddress(bytes32 token) public view returns (address) {
+        return lockedTokens[token];
+    }
+
     function onERC721Received(address /*operator*/, address /*from*/, uint256 /*tokenId*/, bytes memory) public virtual override returns (bytes4) {
-        /*
-        Batch memory b;
-        b.adr = from;
-        b.tId = tokenId;
-
-        lockToken(operator, b);
-        */
-
         return this.onERC721Received.selector;
     }
 }

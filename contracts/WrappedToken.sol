@@ -30,7 +30,6 @@ contract WrappedToken is ERC721 {
     
 
     function mintWrappedToken(uint256 blockNo, bytes memory merkleProof) public isOwner returns (uint256) {
-
         require(_relayContract.isEventInBlock(blockNo, merkleProof), "Event not in block");
         
         // create new token/batch
