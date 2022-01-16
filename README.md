@@ -5,6 +5,7 @@
 
 ## Migrate:
 `ganache-cli -p 7545 -i 5777 -s "42"`
+
 `truffle migrate`
 
 ## Run tests (while ganache instance is running):
