@@ -3,7 +3,6 @@ pragma solidity ^0.8.0;
 import "truffle/Assert.sol";
 import "truffle/DeployedAddresses.sol";
 import "../contracts/Component.sol";
-import "../contracts/ComponentFactory.sol";
 import "../contracts/WrappingContract.sol";
 
 contract TestWrappedToken {
