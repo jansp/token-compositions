@@ -1,4 +1,4 @@
-# Cross Chain composed Tokens - WIP
+# Cross Chain Tokens with Components - WIP
 
 ## Compile contracts:
 `truffle compile`
